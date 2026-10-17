@@ -43,14 +43,36 @@ class ModelConfig:
 LLM_GATEWAY_URL = os.environ.get("SH_LLM_GATEWAY_URL", "http://localhost:8080")
 
 MODEL_REGISTRY: dict[str, ModelConfig] = {
-    # --- Proprietary (via OpenRouter) ---
+    # --- Anthropic native API ---
+    "sonnet-5.5": ModelConfig(
+        name="sonnet-5.5",
+        adapter_type=AdapterType.ANTHROPIC,
+        base_url="https://api.anthropic.com",
+        api_key_env="ANTHROPIC_API_KEY",
+        model_id="claude-sonnet-5-5",
+    ),
+    # --- OpenAI native API  ---
+    # Current OpenAI models reject `max_tokens` and (for reasoning models) non-default
+    # temperature, hence the extra flags (see OpenAICompatibleAdapter._send).
+    # NOTE: confirm model_id against your OpenAI account's model list.
     "gpt-5.3": ModelConfig(
         name="gpt-5.3",
         adapter_type=AdapterType.OPENAI_COMPATIBLE,
-        base_url="https://openrouter.ai/api/v1",
-        api_key_env="OPENROUTER_API_KEY",
-        model_id="openai/gpt-5.3-chat",
+        base_url="https://api.openai.com/v1",
+        api_key_env="OPENAI_API_KEY",
+        model_id="gpt-5.3-chat-latest",
+        extra={"max_tokens_param": "max_completion_tokens", "omit_temperature": True},
     ),
+    "gpt-5": ModelConfig(
+        name="gpt-5",
+        adapter_type=AdapterType.OPENAI_COMPATIBLE,
+        base_url="https://api.openai.com/v1",
+        api_key_env="OPENAI_API_KEY",
+        model_id="gpt-5",
+        # gpt-5 is a reasoning model: it rejects temperature != 1 with a 400.
+        extra={"max_tokens_param": "max_completion_tokens", "omit_temperature": True},
+    ),
+    # --- Proprietary (via OpenRouter) ---
     "opus-4.6": ModelConfig(
         name="opus-4.6",
         adapter_type=AdapterType.OPENAI_COMPATIBLE,
@@ -206,6 +228,8 @@ RETRIEVAL_BASELINES = {"bm25", "sapbert", "hybrid"}
 
 COST_RATES: dict[str, tuple[float, float]] = {
     "gpt-5.3":       (1.75, 14.00),
+    "gpt-5":       (1.25, 10.00),
+    "sonnet-5.5":  (2.00, 10.00),
     "opus-4.6":      (5.00, 25.00),
     "gemini-3.1":    (2.00, 12.00),
     "llama-4":       (0.11, 0.34),
@@ -265,6 +289,8 @@ TASK_MAX_TOKENS: dict[str, int] = {
 # Context window sizes per model (for input token budget calculations)
 MODEL_CONTEXT_WINDOWS: dict[str, int] = {
     "gpt-5.3": 128000,
+    "gpt-5": 128000,
+    "sonnet-5.5": 128000,
     "opus-4.6": 200000,
     "gemini-3.1": 1000000,
     "llama-4": 128000,

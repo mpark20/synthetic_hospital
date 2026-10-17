@@ -40,6 +40,8 @@ services:
       EPIC_SIM_REDIS_URL: redis://redis:6379/0
       EPIC_SIM_FHIR_BASE_URL: http://localhost:${APP_PORT:-8000}/fhir
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       # Shared secret for the /score (reward) endpoint; keep it away from the policy under training.
       EPIC_SIM_SCORER_TOKEN: ${EPIC_SIM_SCORER_TOKEN:-dev-scorer-token-change-in-production}
     volumes:
@@ -49,7 +51,7 @@ services:
       - ./results:/app/results
       # Optional: SNOMED CT / LOINC releases for the terminology tools (any version, any
       # folder layout). Loaded automatically on the next boot; ICD-10-CM is downloaded.
-      # - ./data/ontology:/app/data/ontology:ro
+      - ./data/ontology:/app/data/ontology
     depends_on:
       postgres:
         condition: service_healthy

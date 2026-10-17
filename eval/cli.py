@@ -429,7 +429,7 @@ def main():
     p.set_defaults(func=cmd_list_runs)
 
     # --- Phase F: Agent evaluation ---
-    AGENT_MODELS_LIST = ["gpt-5.3", "gemini-3.1", "glm-5-agent", "opus-4.6", "kimi-2.5-thinking-improved", "kimi-2.5-improved"]
+    AGENT_MODELS_LIST = ["gpt-5.3", "gpt-5", "gemini-3.1", "glm-5-agent", "opus-4.6", "sonnet-5.5", "kimi-2.5-thinking-improved", "kimi-2.5-improved"]
     AGENT_TASKS_LIST = ["patient_diagnosis", "context_summarization", "evidence_retrieval", "imaging_indication"]
 
     # agent-run
