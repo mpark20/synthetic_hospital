@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 import httpx
 
 from eval.config import AdapterType, ModelConfig, get_api_key
+from eval.trace_log import record_call
 
 log = logging.getLogger(__name__)
 
@@ -200,7 +201,7 @@ class ModelAdapter:
 class OpenAICompatibleAdapter(ModelAdapter):
     """Adapter for OpenAI-compatible chat completions API.
 
-    Covers: GPT, Llama, Qwen, DeepSeek, Mistral, Gemma, GLM, vLLM, Ollama.
+    Covers: native OpenAI, OpenRouter, and locally served models (vLLM, Ollama).
     """
 
     def _send(self, messages: list[dict], tools: list[dict] | None = None) -> ModelResponse:
@@ -212,9 +213,11 @@ class OpenAICompatibleAdapter(ModelAdapter):
         payload = {
             "model": self.config.model_id,
             "messages": messages,
-            "temperature": self.config.temperature,
-            "max_tokens": self.config.max_tokens,
+            self.config.extra.get("max_tokens_param", "max_tokens"): self.config.max_tokens,
         }
+        # Some native OpenAI models only accept the default temperature.
+        if not self.config.extra.get("omit_temperature"):
+            payload["temperature"] = self.config.temperature
         if tools:
             payload["tools"] = tools
             payload["tool_choice"] = "auto"
@@ -234,6 +237,14 @@ class OpenAICompatibleAdapter(ModelAdapter):
                 headers=headers,
                 json=payload,
             )
+            if resp.is_error:
+                # Trace failed requests too, so a rejected payload (e.g. 400 on an
+                # unsupported parameter) is visible instead of silently leaving no trace.
+                record_call(adapter="openai_compatible", model_id=self.config.model_id,
+                            request=payload, response_body=resp.text, text="",
+                            input_tokens=0, output_tokens=0,
+                            latency_ms=int((time.monotonic() - t0) * 1000),
+                            error=f"HTTP {resp.status_code}")
             resp.raise_for_status()
             raw_json = resp.text
             data = resp.json()
@@ -257,7 +268,7 @@ class OpenAICompatibleAdapter(ModelAdapter):
                     args = {}
                 parsed_tool_calls.append({"name": fn["name"], "arguments": args})
 
-        return ModelResponse(
+        result = ModelResponse(
             text=text,
             input_tokens=usage.get("prompt_tokens", 0),
             output_tokens=usage.get("completion_tokens", 0),
@@ -266,6 +277,11 @@ class OpenAICompatibleAdapter(ModelAdapter):
             tool_calls=parsed_tool_calls,
             raw_tool_calls=raw_tool_calls,
         )
+        record_call(adapter="openai_compatible", model_id=self.config.model_id,
+                    request=payload, response_body=raw_json, text=text,
+                    input_tokens=result.input_tokens, output_tokens=result.output_tokens,
+                    latency_ms=latency_ms, tool_calls=parsed_tool_calls)
+        return result
 
     def call(self, system_prompt: str, user_prompt: str) -> ModelResponse:
         return self._send([
@@ -367,8 +383,14 @@ class AnthropicAdapter(ModelAdapter):
         latency_ms = int((time.monotonic() - t0) * 1000)
 
         if openai_mode:
-            return self._parse_openai_response(data, raw_json, latency_ms)
-        return self._parse_anthropic_response(data, raw_json, latency_ms)
+            result = self._parse_openai_response(data, raw_json, latency_ms)
+        else:
+            result = self._parse_anthropic_response(data, raw_json, latency_ms)
+        record_call(adapter="anthropic", model_id=self.config.model_id,
+                    request=payload, response_body=raw_json, text=result.text,
+                    input_tokens=result.input_tokens, output_tokens=result.output_tokens,
+                    latency_ms=latency_ms, tool_calls=result.tool_calls)
+        return result
 
     def _parse_anthropic_response(
         self, data: dict, raw_json: str, latency_ms: int

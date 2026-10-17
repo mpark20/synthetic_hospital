@@ -19,6 +19,7 @@ from eval.agents.prompts import build_patient_intro, build_system_prompt
 from eval.agents.structured_agent import StructuredAgentHarness
 from eval.config import EVAL_TASKS, MODEL_REGISTRY, get_pg_connection
 from eval.scoring import compute_all_metrics
+from eval.trace_log import trace_context
 
 log = logging.getLogger(__name__)
 
@@ -644,17 +645,19 @@ def run_agent_evaluation(
                 task_kwargs = task_kwargs_map.get(gt_id, {})
 
                 try:
-                    result = run_agent_session(
-                        model_name=model_name,
-                        arm=arm,
-                        task=task,
-                        patient_id=pid,
-                        gt_id=gt_id,
-                        api_base=api_base,
-                        container_id=container_id,
-                        auth_token=auth_token,
-                        **task_kwargs,
-                    )
+                    with trace_context(run_id=run_id, gt_id=gt_id, task=task,
+                                       model=model_name, arm=arm, patient_id=pid):
+                        result = run_agent_session(
+                            model_name=model_name,
+                            arm=arm,
+                            task=task,
+                            patient_id=pid,
+                            gt_id=gt_id,
+                            api_base=api_base,
+                            container_id=container_id,
+                            auth_token=auth_token,
+                            **task_kwargs,
+                        )
                     store_agent_prediction(conn, run_id, gt_id, result, arm)
                     success += 1
                 except Exception as e:

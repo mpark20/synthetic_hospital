@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from eval.adapters import ModelResponse, create_adapter
 from eval.config import MODEL_REGISTRY, get_pg_connection
 from eval.scoring import compute_all_metrics
+from eval.trace_log import trace_context
 from eval.tasks import TASK_FORMATTERS, TASK_LOADERS, TASK_PARSERS
 
 log = logging.getLogger(__name__)
@@ -91,7 +92,9 @@ def run_evaluation(
             # TODO: Few-shot example selection logic pending implementation.
             # format_prompt() currently falls back to zero_shot when strategy='few_shot'.
             system_prompt, user_prompt = formatter(inp, prompt_strategy)
-            response = adapter.call_with_retry(system_prompt, user_prompt)
+            with trace_context(run_id=run_id, gt_id=inp.gt_id, task=task,
+                               model=model_name, strategy=prompt_strategy):
+                response = adapter.call_with_retry(system_prompt, user_prompt)
             parsed = parser(response.text)
             return inp, response, parsed
 
