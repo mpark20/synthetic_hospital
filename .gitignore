@@ -29,3 +29,7 @@ results/
 # Exported Harbor tasks and Harbor job output (contain per-export scorer tokens)
 harbor_tasks/
 jobs/
+
+# Container artifacts
+*.tar
+*.sif
