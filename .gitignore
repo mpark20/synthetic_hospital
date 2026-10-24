@@ -13,6 +13,7 @@ __pycache__/
 # Secrets / environment
 .env
 .env.local
+.venv/
 
 # IDE / OS
 .DS_Store
@@ -33,3 +34,4 @@ jobs/
 # Container artifacts
 *.tar
 *.sif
+sh-state/

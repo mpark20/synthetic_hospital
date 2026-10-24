@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     sqlite_source: Path = Path(__file__).resolve().parent.parent.parent / "benchmark_v1.3.db"   # released benchmark DB at the repo root
     ontology_dir: Path = Path(__file__).resolve().parent.parent.parent / "data" / "ontology"
 
-    model_config = {"env_prefix": "EPIC_SIM_", "env_file": ".env"}
+    model_config = {"env_prefix": "EPIC_SIM_", "env_file": ".env", "extra": "ignore"}
 
 
 settings = Settings()

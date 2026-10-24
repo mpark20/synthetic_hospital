@@ -72,6 +72,16 @@ MODEL_REGISTRY: dict[str, ModelConfig] = {
         # gpt-5 is a reasoning model: it rejects temperature != 1 with a 400.
         extra={"max_tokens_param": "max_completion_tokens", "omit_temperature": True},
     ),
+    # --- Open source (via vLLM) ---
+    "qwen3-4b": ModelConfig(
+        name="qwen3-4b",
+        adapter_type=AdapterType.OPENAI_COMPATIBLE,
+        base_url="http://localhost:30001/v1",
+        api_key_env="",   # empty -> get_api_key returns "", no auth header
+        model_id="Qwen/Qwen3.5-4B",  # must match --served-model-name
+        max_tokens=8192,
+        timeout_secs=600.0,
+    ),
     # --- Proprietary (via OpenRouter) ---
     "opus-4.6": ModelConfig(
         name="opus-4.6",

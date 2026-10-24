@@ -51,6 +51,7 @@ class ModelResponse:
     raw_json: str | dict | None
     tool_calls: list[dict] | None = None       # parsed: [{"name": ..., "arguments": dict}]
     raw_tool_calls: list[dict] | None = None   # original format for conversation history
+    reasoning: str | None = None               # thinking text, when the API returns it
 
 
 # ---------------------------------------------------------------------------
@@ -276,6 +277,8 @@ class OpenAICompatibleAdapter(ModelAdapter):
             raw_json=raw_json,
             tool_calls=parsed_tool_calls,
             raw_tool_calls=raw_tool_calls,
+            # vLLM/DeepSeek/Kimi use `reasoning_content`; OpenRouter uses `reasoning`.
+            reasoning=message.get("reasoning_content") or message.get("reasoning") or None,
         )
         record_call(adapter="openai_compatible", model_id=self.config.model_id,
                     request=payload, response_body=raw_json, text=text,
@@ -376,6 +379,12 @@ class AnthropicAdapter(ModelAdapter):
                 headers=headers,
                 json=payload,
             )
+            if resp.is_error:
+                record_call(adapter="anthropic", model_id=self.config.model_id,
+                            request=payload, response_body=resp.text, text="",
+                            input_tokens=0, output_tokens=0,
+                            latency_ms=int((time.monotonic() - t0) * 1000),
+                            error=f"HTTP {resp.status_code}")
             resp.raise_for_status()
             raw_json = resp.text
             data = json.loads(raw_json, strict=False)
@@ -397,11 +406,14 @@ class AnthropicAdapter(ModelAdapter):
     ) -> ModelResponse:
         """Parse standard Anthropic Messages API response."""
         text_parts = []
+        thinking_parts = []
         parsed_tool_calls = []
         raw_tool_calls_anthropic = []
         for block in data.get("content", []):
             if block.get("type") == "text":
                 text_parts.append(block.get("text", ""))
+            elif block.get("type") == "thinking":
+                thinking_parts.append(block.get("thinking", ""))
             elif block.get("type") == "tool_use":
                 tool_use_id = block.get("id", "")
                 name = block["name"]
@@ -427,6 +439,7 @@ class AnthropicAdapter(ModelAdapter):
             raw_json=raw_json,
             tool_calls=parsed_tool_calls if parsed_tool_calls else None,
             raw_tool_calls=raw_tool_calls_anthropic if raw_tool_calls_anthropic else None,
+            reasoning="\n".join(thinking_parts) or None,
         )
 
     def _parse_openai_response(
@@ -466,15 +479,19 @@ class AnthropicAdapter(ModelAdapter):
         anthropic_messages = []
         for msg in messages:
             if msg["role"] == "tool":
-                # OpenAI tool result → Anthropic tool_result in a user message
-                anthropic_messages.append({
-                    "role": "user",
-                    "content": [{
-                        "type": "tool_result",
-                        "tool_use_id": msg.get("tool_call_id", ""),
-                        "content": msg.get("content", ""),
-                    }],
-                })
+                # OpenAI tool result → Anthropic tool_result in a user message.
+                # Results of one parallel batch must share a single user message.
+                block = {
+                    "type": "tool_result",
+                    "tool_use_id": msg.get("tool_call_id", ""),
+                    "content": msg.get("content", ""),
+                }
+                prev = anthropic_messages[-1] if anthropic_messages else None
+                if (prev and prev["role"] == "user" and isinstance(prev["content"], list)
+                        and all(b.get("type") == "tool_result" for b in prev["content"])):
+                    prev["content"].append(block)
+                else:
+                    anthropic_messages.append({"role": "user", "content": [block]})
             elif msg["role"] == "assistant" and msg.get("tool_calls"):
                 # OpenAI assistant with tool_calls → Anthropic assistant with tool_use blocks
                 content_blocks = []
