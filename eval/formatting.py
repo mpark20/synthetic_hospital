@@ -3,7 +3,7 @@
 Each finished episode becomes one JSONL line in OpenAI chat format, loadable by
 TRL / axolotl / torchtune without conversion:
 
-    {"messages": [...], "tools": [...], "reward": 0.8, "metrics": {...}, "meta": {...}}
+    {"messages": [...], "tools": [...], "reward": 0.8, "metrics": {...}, "ground_truth": {...}, "meta": {...}}
 
 Only turns the policy produced are assistant messages; harness nudges ("please call a
 tool") and failed turns are left out, so the transcript is what a trained model should
@@ -54,12 +54,25 @@ def tool_message(tool_call_id: str, content: str) -> dict:
     return {"role": "tool", "tool_call_id": tool_call_id, "content": content}
 
 
-def write_episode(path: str, *, messages: list[dict], tools: list[dict], reward: float,
-                  metrics: dict | None, meta: dict) -> None:
+def write_episode(
+    path: str, *,
+    messages: list[dict],
+    tools: list[dict],
+    reward: float,
+    metrics: dict | None,
+    meta: dict,
+    ground_truth: dict | None = None
+) -> None:
     """Append one episode to the JSONL file at `path`. Never raises into the eval path."""
     try:
-        entry = {"messages": messages, "tools": tools, "reward": reward,
-                 "metrics": metrics or {}, "meta": meta}
+        entry = {
+            "messages": messages,
+            "tools": tools,
+            "reward": reward,
+            "metrics": metrics or {},
+            "ground_truth": ground_truth,
+            "meta": meta
+        }
         with _lock:
             os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
             with open(path, "a") as f:

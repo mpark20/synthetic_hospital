@@ -86,6 +86,7 @@ def run_episode(env: SyntheticHospitalEnv, adapter, obs) -> dict:
     return {
         "reward": reward, "done": done, "steps": steps,
         "metric": info.get("reward_metric"), "metrics": info.get("metrics"),
+        "ground_truth": info.get("ground_truth"),
         "input_tokens": in_tok, "output_tokens": out_tok,
         "nudges": nudges, "malformed_tool_calls": malformed, "transcript": convo
     }
@@ -158,8 +159,8 @@ def main() -> None:
                     res = {"reward": 0.0, "done": False, "steps": 0, "error": repr(e)}
                 res.update(episode=i, gt_id=obs.gt_id, patient_id=obs.patient_id, task=args.task,
                         split=args.split, model=args.model, seconds=round(time.monotonic() - t0, 1))
-                
                 transcript = res.pop("transcript", None)
+                ground_truth = res.pop("ground_truth", None)   # labels stay out of the --out summary lines
 
                 metadata = {k: res.get(k) for k in [
                     "task", "split", "model", "episode", "gt_id", "patient_id", "steps",
@@ -175,6 +176,7 @@ def main() -> None:
                         tools=obs.tools,
                         reward=res["reward"],
                         metrics=res.get("metrics"),
+                        ground_truth=ground_truth,
                         meta=metadata
                     )
                 rewards.append(res["reward"])

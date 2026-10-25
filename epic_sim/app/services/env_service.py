@@ -370,6 +370,7 @@ async def step(redis, db, dispatch, episode_id: str, name: str, arguments: dict,
         prediction = normalize_submission(task, arguments)
         with _pg() as conn:
             result = await run_in_threadpool(score_submission, conn, ep["gt_id"], prediction or {}, task, None)
+            gt_labels = load_instance(conn, ep["gt_id"])["ground_truth"] if privileged else None
         ep.update({"done": True, "submitted": True, "reward": result["reward"], "steps": ep["steps"] + 1})
         ep["trace"].append({"step": ep["steps"], "tool_name": name, "submitted": True,
                             "forced": remaining <= 0, "malformed": prediction is None})
@@ -377,7 +378,7 @@ async def step(redis, db, dispatch, episode_id: str, name: str, arguments: dict,
         obs = {"status": "submitted", "malformed": prediction is None}
         info = {"forced": remaining <= 0, "malformed": prediction is None, "steps": ep["steps"]}
         if privileged:
-            info.update({"reward_metric": result["reward_metric"], "metrics": result["metrics"]})
+            info.update({"reward_metric": result["reward_metric"], "metrics": result["metrics"], "ground_truth": gt_labels})
         return {**base, "step": ep["steps"], "observation": obs, "observation_text": render(obs),
                 "remaining": max(remaining - 1, 0), "reward": result["reward"] if privileged else None,
                 "done": True, "info": info}
