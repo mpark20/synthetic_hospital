@@ -29,17 +29,17 @@ SNOMED_DIR = (
     Path(__file__).resolve().parent.parent.parent
     / "data"
     / "ontology"
-    / "SnomedCT_ManagedServiceUS_PRODUCTION_US1000124_20250901T120000Z"
+    / "SnomedCT_ManagedServiceUS_PRODUCTION_US1000124_20260901T120000Z"
     / "Snapshot"
 )
 
-CONCEPT_FILE = SNOMED_DIR / "Terminology" / "sct2_Concept_Snapshot_US1000124_20250901.txt"
-DESCRIPTION_FILE = SNOMED_DIR / "Terminology" / "sct2_Description_Snapshot-en_US1000124_20250901.txt"
-EXTENDED_MAP_FILE = SNOMED_DIR / "Refset" / "Map" / "der2_iisssccRefset_ExtendedMapSnapshot_US1000124_20250901.txt"
-RELATIONSHIP_FILE = SNOMED_DIR / "Terminology" / "sct2_Relationship_Snapshot_US1000124_20250901.txt"
+CONCEPT_FILE = SNOMED_DIR / "Terminology" / "sct2_Concept_Snapshot_US1000124_20260901.txt"
+DESCRIPTION_FILE = SNOMED_DIR / "Terminology" / "sct2_Description_Snapshot-en_US1000124_20260901.txt"
+EXTENDED_MAP_FILE = SNOMED_DIR / "Refset" / "Map" / "der2_iisssccRefset_ExtendedMapSnapshot_US1000124_20260901.txt"
+RELATIONSHIP_FILE = SNOMED_DIR / "Terminology" / "sct2_RelationshipConcreteValues_Snapshot_US1000124_20260901.txt"
 
 # Ontology release tag (for freezing/versioning the relatedness graph).
-SNOMED_RELEASE = "SNOMED US 20250901"
+SNOMED_RELEASE = "SNOMED US 20260901"
 
 # Concept-model relationship typeIds that express disease-disease relatedness
 # (spec_v1.33 §17.5). Mapped to diagnosis_relations.edge_type names.
@@ -75,9 +75,9 @@ class SNOMEDDictionary:
         self._token_index: dict[str, set[str]] = {}    # token → {concept_ids}
         self._icd10_to_snomed: dict[str, list[str]] = {}  # icd10_code → [concept_ids]
 
-        concept_file = snomed_dir / "Terminology" / "sct2_Concept_Snapshot_US1000124_20250901.txt"
-        desc_file = snomed_dir / "Terminology" / "sct2_Description_Snapshot-en_US1000124_20250901.txt"
-        map_file = snomed_dir / "Refset" / "Map" / "der2_iisssccRefset_ExtendedMapSnapshot_US1000124_20250901.txt"
+        concept_file = snomed_dir / "Terminology" / "sct2_Concept_Snapshot_US1000124_20260901.txt"
+        desc_file = snomed_dir / "Terminology" / "sct2_Description_Snapshot-en_US1000124_20260901.txt"
+        map_file = snomed_dir / "Refset" / "Map" / "der2_iisssccRefset_ExtendedMapSnapshot_US1000124_20260901.txt"
 
         self._load_concepts(concept_file)
         self._load_descriptions(desc_file)

@@ -37,10 +37,13 @@ from starlette.concurrency import run_in_threadpool
 from epic_sim.app.config import settings
 from eval.agents.prompts import SUBMIT_TOOL_SCHEMAS, build_patient_intro, build_system_prompt
 from eval.score_one import InstanceNotFound, list_instances, load_instance, score_submission
+from eval.tasks.patient_diagnosis import normalize_problem_list
 
 OUTCOME_SECTIONS = {"assessment", "plan"}
 SUBMIT_TOOLS = {"submit_diagnosis", "submit_summary", "submit_pre_read", "submit_rankings"}
 MAX_OBS_CHARS = 8000
+# Env-only: replace an ICD-10 code that clearly does not describe the diagnosis name given.
+RESOLVE_ICD10_FROM_NAME = True
 
 TASK_KEYS = {
     "patient_diagnosis": ("active_diagnoses", "chronic_conditions"),
@@ -190,11 +193,36 @@ def render(obs) -> str:
 
 
 def normalize_submission(task: str, obj) -> dict | None:
-    """Coerce submit-tool arguments into the scorer's schema (paper harness rules)."""
+    """Coerce submit-tool arguments into the scorer's schema (paper harness rules).
+
+    For patient_diagnosis the problem list also gets the harness's parse-time
+    normalization (ICD-10 validation/correction, acuity, dedup) plus name-based
+    code resolution.
+    """
+    pred = _coerce_submission(task, obj)
+    if pred is not None and task == "patient_diagnosis":
+        active, chronic = normalize_problem_list(
+            pred.get("active_diagnoses"),
+            pred.get("chronic_conditions"),
+            resolve_from_name=RESOLVE_ICD10_FROM_NAME
+        )
+        pred = {"active_diagnoses": active, "chronic_conditions": chronic}
+    return pred
+
+
+def _code_fixes(prediction: dict | None) -> dict:
+    """Counts of ICD-10 codes the submit path corrected (prefix) or resolved (from name; of which SNOMED)."""
+    dx = [e for k in ("active_diagnoses", "chronic_conditions") for e in (prediction or {}).get(k, [])]
+    return {"icd10_corrected": sum(bool(e.get("icd10_corrected")) for e in dx),
+            "icd10_resolved": sum(bool(e.get("icd10_resolved")) for e in dx),
+            "icd10_resolved_snomed": sum(str(e.get("icd10_resolved_via", "")).startswith("snomed") for e in dx)}
+
+
+def _coerce_submission(task: str, obj) -> dict | None:
     keys = TASK_KEYS.get(task, ())
     if isinstance(obj, dict):
         if "payload" in obj and isinstance(obj["payload"], (dict, list)):
-            return normalize_submission(task, obj["payload"])
+            return _coerce_submission(task, obj["payload"])
         if any(k in obj for k in keys):
             return obj
         if task == "patient_diagnosis" and "icd10" in obj:
@@ -373,7 +401,8 @@ async def step(redis, db, dispatch, episode_id: str, name: str, arguments: dict,
             gt_labels = load_instance(conn, ep["gt_id"])["ground_truth"] if privileged else None
         ep.update({"done": True, "submitted": True, "reward": result["reward"], "steps": ep["steps"] + 1})
         ep["trace"].append({"step": ep["steps"], "tool_name": name, "submitted": True,
-                            "forced": remaining <= 0, "malformed": prediction is None})
+                            "forced": remaining <= 0, "malformed": prediction is None,
+                            **_code_fixes(prediction)})
         await _save(redis, ep)
         obs = {"status": "submitted", "malformed": prediction is None}
         info = {"forced": remaining <= 0, "malformed": prediction is None, "steps": ep["steps"]}

@@ -4,6 +4,7 @@ __pycache__/
 *.pyo
 .venv/
 .pytest_cache/
+*.ipynb
 
 # SQLite sidecar files (keep the .db itself, ignore its transient journals)
 *.db-journal

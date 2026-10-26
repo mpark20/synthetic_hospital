@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 from eval.config import MODEL_CONTEXT_WINDOWS, TASK_MAX_TOKENS
+from eval.icd10_validator import format_icd10
 from eval.prompts import get_prompt
 from eval.tasks.diagnosis import normalize_icd10, _strip_markdown
 
@@ -274,9 +275,35 @@ def parse_output(raw_text: str) -> dict:
     }
 
 
-def _normalize_entries(entries: list, default_acuity: str) -> list[dict]:
+def normalize_problem_list(
+    active: list,
+    chronic: list, *,
+    resolve_from_name: bool = False
+) -> tuple[list[dict], list[dict]]:
+    """Normalize, ICD-validate and dedup an already-parsed problem list.
+
+    The same pipeline parse_output applies to model text; shared so the
+    environment's submit path scores the same entries the eval harness would.
+    `resolve_from_name` additionally replaces a code that clearly does not
+    describe its stated name (see icd10_validator.resolve_icd10_from_name).
+    """
+    norm_active = _normalize_entries(active if isinstance(active, list) else [],
+                                     default_acuity="acute", resolve_from_name=resolve_from_name)
+    norm_chronic = _normalize_entries(chronic if isinstance(chronic, list) else [],
+                                      default_acuity="chronic", resolve_from_name=resolve_from_name)
+    active, chronic = _dedup_across_lists(norm_active, norm_chronic)
+    # parse_output keeps codes undotted (its internal canonical form); entries leaving here
+    # use the standard dotted form. The scorer normalizes codes itself, so rewards are unaffected.
+    for entry in active + chronic:
+        for key in ("icd10", "icd10_original"):
+            if entry.get(key):
+                entry[key] = format_icd10(entry[key])
+    return active, chronic
+
+
+def _normalize_entries(entries: list, default_acuity: str, resolve_from_name: bool = False) -> list[dict]:
     """Normalize a list of diagnosis entries."""
-    from eval.icd10_validator import is_valid_icd10, nearest_valid_icd10
+    from eval.icd10_validator import is_valid_icd10, nearest_valid_icd10, resolve_icd10
 
     result = []
     for dx in entries:
@@ -293,8 +320,16 @@ def _normalize_entries(entries: list, default_acuity: str) -> list[dict]:
             "name": name,
             "acuity": norm_acuity or default_acuity,
         }
+        resolved = resolve_icd10(icd10, name) if resolve_from_name else None
+        if resolved:
+            entry["icd10_original"] = icd10
+            entry["icd10"] = normalize_icd10(resolved.code)
+            entry["icd10_resolved"] = True
+            entry["icd10_resolved_via"] = resolved.via
+            if resolved.snomed_id:
+                entry["snomed_id"] = resolved.snomed_id
         # Validate and correct invalid ICD-10 codes
-        if icd10 and not is_valid_icd10(icd10):
+        elif icd10 and not is_valid_icd10(icd10):
             corrected = nearest_valid_icd10(icd10)
             if corrected:
                 entry["icd10_original"] = icd10

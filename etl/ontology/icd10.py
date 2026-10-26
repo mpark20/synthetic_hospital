@@ -102,7 +102,7 @@ class ICD10Dictionary:
         # Require at least 1 token overlap, sort by overlap count
         candidates = sorted(
             [(c, s) for c, s in candidate_scores.items() if s >= 1],
-            key=lambda x: x[1], reverse=True,
+            key=lambda x: (-x[1], x[0]),  # code tie-break: stable across hash seeds
         )[:300]  # Cap for performance
 
         # Stage 2: SequenceMatcher scoring
@@ -116,7 +116,7 @@ class ICD10Dictionary:
             if ratio >= min_score:
                 scored.append((entry, ratio))
 
-        scored.sort(key=lambda x: x[1], reverse=True)
+        scored.sort(key=lambda x: (-x[1], x[0].code))
         return scored[:top_k]
 
     def get_candidates(self, query: str, top_k: int = 5) -> list[ICD10Code]:

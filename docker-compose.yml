@@ -52,6 +52,7 @@ services:
       # Optional: SNOMED CT / LOINC releases for the terminology tools (any version, any
       # folder layout). Loaded automatically on the next boot; ICD-10-CM is downloaded.
       - ./data/ontology:/app/data/ontology
+      - ./scripts:/app/scripts
     depends_on:
       postgres:
         condition: service_healthy
