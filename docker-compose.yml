@@ -53,6 +53,7 @@ services:
       # folder layout). Loaded automatically on the next boot; ICD-10-CM is downloaded.
       - ./data/ontology:/app/data/ontology
       - ./scripts:/app/scripts
+      - ./epic_sim:/app/epic_sim
     depends_on:
       postgres:
         condition: service_healthy

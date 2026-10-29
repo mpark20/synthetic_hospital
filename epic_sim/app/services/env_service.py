@@ -43,7 +43,8 @@ OUTCOME_SECTIONS = {"assessment", "plan"}
 SUBMIT_TOOLS = {"submit_diagnosis", "submit_summary", "submit_pre_read", "submit_rankings"}
 MAX_OBS_CHARS = 8000
 # Env-only: replace an ICD-10 code that clearly does not describe the diagnosis name given.
-RESOLVE_ICD10_FROM_NAME = True
+RESOLVE_ICD10_FROM_NAME = False
+print(f"RESOLVE_ICD10_FROM_NAME={RESOLVE_ICD10_FROM_NAME}")
 
 TASK_KEYS = {
     "patient_diagnosis": ("active_diagnoses", "chronic_conditions"),
