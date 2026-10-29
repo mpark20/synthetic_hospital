@@ -49,7 +49,7 @@ def run_episode(env: SyntheticHospitalEnv, adapter, obs) -> dict:
     # the extra turns just let a model that ignores the warning still submit.
     for _ in range(obs.budget + 5):
         resp = adapter.call_multi_turn_with_retry(obs.instructions, messages, tools=obs.tools)
-        in_tok += resp.input_tokens
+        in_tok = resp.input_tokens  # each call re-sends the history, so the last call's prompt is the trajectory's input size
         out_tok += resp.output_tokens
 
         if not resp.tool_calls:

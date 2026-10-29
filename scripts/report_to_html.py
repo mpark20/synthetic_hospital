@@ -224,33 +224,27 @@ def render_record(rec, title=None):
             f'<body>{body}<script>{JS}</script></body></html>')
 
 
-def convert_file(src, num_reports=1):
-    """Write HTML for every record in a .json or .jsonl file. Returns the output paths."""
+def convert_file(src, idx=0):
+    """Write HTML for every record in a .jsonl file. Returns the output paths."""
     src = Path(src)
     text = src.read_text(encoding="utf-8")
     out_dir = src.parent.parent / "html_traces"
+
+    if src.suffix != ".jsonl":
+        raise ValueError(f"Expected .jsonl input file, but got {src.suffix}")
     
-    if src.suffix == ".json":
-        recs = json.loads(text)
-        recs = recs if isinstance(recs, list) else [recs]
-    elif src.suffix == ".jsonl":
-        recs = [json.loads(line) for line in text.splitlines() if line.strip()]
-        recs = recs[:num_reports]
-    else:
-        raise ValueError(f"Expected .json or .jsonl input file, but got {src.suffix}")
+    recs = [json.loads(line) for line in text.splitlines() if line.strip()]
+    rec = recs[max(idx, len(recs) - 1)]
     
-    paths = []
-    for k, rec in enumerate(recs):
-        out_dir.mkdir(parents=True, exist_ok=True)
-        out_file = out_dir / f"{src.stem}_{k:03d}.html"
-        out_file.write_text(render_record(rec), encoding="utf-8")
-        paths.append(out_file)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_file = out_dir / f"{src.stem}_{idx:03d}.html"
+    out_file.write_text(render_record(rec), encoding="utf-8")
     
-    return paths
+    return out_file
 
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         sys.exit(__doc__)
-    for p in convert_file(sys.argv[1], num_reports=int(sys.argv[2])):
-        print("wrote", p)
+    out_file = convert_file(sys.argv[1], idx=int(sys.argv[2]))
+    print(f"Wrote {out_file}")
